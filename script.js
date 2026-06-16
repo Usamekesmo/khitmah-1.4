@@ -1171,20 +1171,19 @@ async function kickUserFromCircle() {
     }, 3000);
 }
 
-function showCompletionShareUI() {
+function showCompletionShareUI(completedJuz) {
     const area = document.getElementById('completionMessageArea');
     const completionText = document.getElementById('completionText');
     if(area && completionText) {
         const totalParts = currentMemberData.totalPartsRead || 0;
-        const currentJuzNum = currentMemberData.currentJuz;
         const extraCount = currentMemberData.dailyGoalCompleted || 0;
-        const newKhatmas = calcKhatmasFromParts(totalParts + 1);
-        const oldKhatmas = calcKhatmasFromParts(totalParts);
+        const newKhatmas = calcKhatmasFromParts(totalParts);
+        const oldKhatmas = calcKhatmasFromParts(totalParts - 1);
         
         if (newKhatmas > oldKhatmas) {
             completionText.innerHTML = `🎉 مبارك! أكملت ختمة رقم ${newKhatmas}! 🎉`;
         } else {
-            completionText.innerHTML = `🎉 أتممت الجزء ${currentJuzNum}${extraCount > 0 ? ` + ${extraCount} جزء إضافي` : ''}!`;
+            completionText.innerHTML = `🎉 أتممت الجزء ${completedJuz}${extraCount > 0 ? ` + ${extraCount} جزء إضافي` : ''}!`;
         }
         area.style.display = 'block';
     }
@@ -1212,6 +1211,10 @@ async function completeDaily() {
         const q = await db.collection('circleMembers').where('userId', '==', currentUser.uid).get();
         if (q.empty) throw new Error();
         const ref = q.docs[0].ref;
+        
+        // حفظ رقم الجزء الذي تم إكماله قبل التحديث
+        const completedJuz = currentMemberData.currentJuz;
+        localStorage.setItem('lastCompletedJuz', completedJuz);
         
         // حساب التقدم الجديد
         const currentJuz = currentMemberData.currentJuz;
@@ -1254,7 +1257,9 @@ async function completeDaily() {
         
         await checkAchievements(currentUser.uid, currentMemberData);
         showToast(`✅ تم تسجيل وردك +1 نقطة${khatmaBonus > 0 ? ` +${khatmaBonus} مكافأة ختمة` : ''}`, false);
-        showCompletionShareUI();
+        
+        // تمرير رقم الجزء الذي تم إكماله
+        showCompletionShareUI(completedJuz);
         await updateUI(); 
         await loadExtraProgress(); 
         updateJuzProgressChart();
@@ -1272,10 +1277,11 @@ async function shareToSocial(platform) {
     const userName = currentMemberData.userName;
     const totalParts = currentMemberData.totalPartsRead || 0;
     const khatmas = calcKhatmasFromParts(totalParts);
-    const currentJuzNum = currentMemberData.currentJuz;
+    // استخدام completedJuz المخزن بدلاً من currentJuz
+    const completedJuz = localStorage.getItem('lastCompletedJuz') || currentMemberData.currentJuz;
     const extraCompleted = currentMemberData.dailyGoalCompleted || 0;
     const extraText = extraCompleted > 0 ? ` + ${extraCompleted} جزء إضافي` : '';
-    const message = `${baseMessage}\n\nالاسم: ${userName}\nتم إتمام الجزء ${currentJuzNum}${extraText}\nإجمالي الأجزاء: ${totalParts}\nعدد الختمات: ${khatmas}\nالسلسلة: ${currentMemberData.streakDays || 0} يوم\n⭐ النقاط: ${Math.floor(currentMemberData.points || 0)}`;
+    const message = `${baseMessage}\n\nالاسم: ${userName}\nتم إتمام الجزء ${completedJuz}${extraText}\nإجمالي الأجزاء: ${totalParts}\nعدد الختمات: ${khatmas}\nالسلسلة: ${currentMemberData.streakDays || 0} يوم\n⭐ النقاط: ${Math.floor(currentMemberData.points || 0)}`;
     const encodedMessage = encodeURIComponent(message);
     let url = '';
     if (platform === 'whatsapp') {
